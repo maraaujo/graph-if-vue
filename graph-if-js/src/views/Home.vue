@@ -84,7 +84,7 @@ const rotaInicio = ref('')
 const rotaDestino = ref('')
 const selectedNodes = ref([])
 const listGraph = ref([])
-
+var count = 0;
 const headers = [
   { title: "Id", key: "nodeId", sortable: true },
   { title: "Nome do nó", key: "nodeLabel", sortable: true },
@@ -174,7 +174,7 @@ cy.value.on('tap', (event) => {
     }
 
   // Clique no plano de fundo (não é nó nem aresta)
-  } else if (target === cy.value) {
+  } else {
     const pos = event.position || event.renderedPosition;
 
     // Gera um ID único (opcionalmente usando timestamp)
@@ -182,14 +182,22 @@ cy.value.on('tap', (event) => {
 
     cy.value.add({
       group: 'nodes',
-      data: { id: newId, label: newId },
+      data: { id: newId, label: graphData.nodeLabel},
+      color: '#7B61FF',
       position: { x: pos.x, y: pos.y }
     });
+     listGraph.value.push({
+      nodeId: newId,
+      nodeLabel: graphData.nodeLabel,
+    })
   }
 });
 
 
 })
+
+
+// })
 
 function submit() {
   const hasNode = graphData.nodeId && graphData.nodeLabel && !cy.value.getElementById(graphData.nodeId).length
