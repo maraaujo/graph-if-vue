@@ -26,7 +26,7 @@
               </VCol>
 
               <VCol cols="12" md="6">
-                <VTextField v-model="graphData.alvoId" label="Nó de destino" />
+                <VTextField v-model="graphData.targetId" label="Nó de destino" />
               </VCol>
             </VRow>
           </VForm>
@@ -142,7 +142,7 @@ const graphData = reactive({
   nodeId: "",
   nodeLabel: "",
   sourceId: "",
-  alvoId: "",
+  targetId: "",
   edgeWeight: 1,
 });
 
@@ -154,7 +154,7 @@ const updateNodeLabel = (id, newLabel) => {
 };
 
 const updateEdgeWeight = (nodeId, newWeight) => {
-  // Como peso pertence à aresta (edge), precisamos identificar a aresta conectada ao nó e atualizar
+ // Como peso pertence à aresta (edge), precisamos identificar a aresta conectada ao nó e atualizar
   // Se seu grafo é orientado, pode ajustar aqui conforme necessário.
   // Aqui, só atualizarei todas as arestas conectadas ao nó com o novo peso para exemplo.
 
@@ -230,29 +230,30 @@ onMounted(() => {
   });
 
   cy.value.on("tap", (event) => {
-    const alvo = event.alvo;
+    const target = event.target;
 
     if (
-      alvo !== cy.value &&
-      typeof alvo.isNode === "function" &&
-      alvo.isNode()
+      target !== cy.value &&
+      typeof target.isNode === "function" &&
+      target.isNode()
     ) {
       //recebe o id
-      const nodeId = alvo.id();
+      const nodeId = target.id();
 
       if (!selectedNodes.value.includes(nodeId)) {
-        alvo.addClass("selected");
+        target.addClass("selected");
         selectedNodes.value.push(nodeId);
       }
 
       if (selectedNodes.value.length === 2) {
-        const [fonte, alvoId] = selectedNodes.value;
-        const edgeId = [fonte, alvoId].sort().join("-");
+        const [source, targetId,] = selectedNodes.value;
+        console.log("dois nós selecionados", [source, targetId]);
+        const edgeId = [source, targetId].sort().join("-");
 
         if (!cy.value.getElementById(edgeId).length) {
           cy.value.add({
             group: "edges",
-            data: { id: edgeId, fonte, alvo: alvoId, weight: 1 },
+            data: { id: edgeId, source: source, target: targetId, weight: 1 },
           });
         }
 
@@ -263,21 +264,18 @@ onMounted(() => {
         selectedNodes.value = [];
         updateAdjacencyMatrix();
       }
-    } else if (
-      alvo === cy.value ||
-      alvo === cy.value.container() ||
-      alvo.group === undefined
-    ) {
+    } else  {
       const pos = event.position || event.renderedPosition;
-
+console.log("posição",pos);
       // Define um novo id incremental para o nó
-      const newNodeId = `n${count++}`;
+      const newNodeId = "n" + (count++);
 
       cy.value.add({
         group: "nodes",
         data: {
           id: newNodeId,
-          label: `Nó ${newNodeId}`,
+          label: graphData.nodeLabel,
+       
           color: "#7B61FF",
         },
         position: { x: pos.x, y: pos.y },
@@ -285,11 +283,11 @@ onMounted(() => {
 
       listGraph.value.push({
         nodeId: newNodeId,
-        nodeLabel: `Nó ${newNodeId}`,
+        nodeLabel: graphData.nodeLabel ,
         edgeWeight: 1,
       });
 
-      updateAdjacencyMatrix();
+       updateAdjacencyMatrix();
     }
   });
 });
@@ -317,15 +315,15 @@ function submit() {
     }
   }
 
-  if (graphData.sourceId && graphData.alvoId) {
-    const edgeId = [graphData.sourceId, graphData.alvoId].sort().join("-");
+  if (graphData.sourceId && graphData.targetId) {
+    const edgeId = [graphData.sourceId, graphData.targetId].sort().join("-");
     if (cy.value.getElementById(edgeId).length === 0) {
       cy.value.add({
         group: "edges",
         data: {
           id: edgeId,
           source: graphData.sourceId,
-          alvo: graphData.alvoId,
+          target: graphData.targetId,
           weight: graphData.edgeWeight || 1,
         },
       });
@@ -342,7 +340,7 @@ function submit() {
   graphData.nodeId = "";
   graphData.nodeLabel = "";
   graphData.sourceId = "";
-  graphData.alvoId = "";
+  graphData.targetId = "";
   graphData.edgeWeight = 1;
 }
 
@@ -356,10 +354,10 @@ function updateAdjacencyMatrix() {
   // Preencher a matriz com pesos
   cy.value.edges().forEach((edge) => {
     const sourceIndex = nodes.value.indexOf(edge.data("source"));
-    const alvoIndex = nodes.value.indexOf(edge.data("alvo"));
-    matrix[sourceIndex][alvoIndex] = edge.data("weight") || 1;
+    const targetIndex = nodes.value.indexOf(edge.data("target"));
+    matrix[sourceIndex][targetIndex] = edge.data("weight") || 1;
     // Se grafo não direcionado, também preencher o inverso
-    matrix[alvoIndex][sourceIndex] = edge.data("weight") || 1;
+    matrix[targetIndex][sourceIndex] = edge.data("weight") || 1;
   });
 
   adjacencyMatrix.value = matrix;
@@ -397,7 +395,7 @@ function encontrarMelhorRota(startId, endId) {
       .edges()
       .filter((edge) => edge.source().id() === currentNode)
       .map((edge) => ({
-        id: edge.alvo().id(),
+        id: edge.target().id(),
         weight: edge.data("weight"),
       }));
 
