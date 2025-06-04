@@ -1,154 +1,83 @@
 <template>
-  <VRow>
-    <VCol cols="12">
-      <VCard title="Grafo com Rota e Peso">
-        <VCardText>
-          <VForm @submit.prevent="submit">
-            <VRow>
-              <VCol cols="12" md="4">
-                <VTextField v-model="graphData.nodeId" label="ID do nó" />
-              </VCol>
+  <VCol cols="12">
+    <VCard title="Gerar grafo através de uma matriz">
+      <VCardText>
+        <div :style="gridStyle">
+          
+          <div v-for="(row, rowIndex) in matrix" :key="rowIndex">
+            {{ rowIndex }}    
+            <div v-for="(cell, colIndex) in row" :key="`${rowIndex}-${colIndex}`" @click="editCell(rowIndex, colIndex)"
+              class="matrix-cell">
+              {{ cell }}
+            </div>
+          </div>
 
-              <VCol cols="12" md="4">
-                <VTextField v-model="graphData.nodeLabel" label="Rótulo do nó" />
-              </VCol>
+        </div>
+      </VCardText>
+    </VCard>
+  </VCol>
+  <div class="d-flex flex-wrap gap-4 justify-sm-space-between justify-center">
+    <VBtn @click="addVertex" color="primary" class="mb-4">Adicionar vértice</VBtn>
+    <VBtn @click="generateGraphFromMatrix" color="success" class="mb-4 ml-2">
+      Gerar Grafo
+    </VBtn>
+  </div>
+<VCard>
+  <VCol cols="12" md="6">
+      <VTextField v-model="graphData.nodeLabel" label="Label do novo nó" />
+  </VCol>
+</VCard>
+  <VCard title="Buscar rota">
 
-              <VCol cols="12" md="4">
-                <VTextField v-model.number="graphData.edgeWeight" label="Peso da aresta" type="number" />
-              </VCol>
-
-              <VCol cols="12" md="6">
-                <VTextField v-model="graphData.sourceId" label="Nó de origem" />
-              </VCol>
-
-              <VCol cols="12" md="6">
-                <VTextField v-model="graphData.targetId" label="Nó de destino" />
-              </VCol>
-            </VRow>
-          </VForm>
-        </VCardText>
-      </VCard>
-    </VCol>
-      
-     <VCol cols="12" class="d-flex justify-end">
-      <VBtn color="primary" @click="submit">Criar</VBtn>
-    </VCol>
-
-    <VCol cols="12">
-      <VCard title="Buscar melhor rota">
-        <VCardText>
-          <VRow>
-            <VCol cols="12" md="6">
+    <VRow>
+        <VCol cols="12" md="6">
               <VTextField v-model="rotaInicio" label="Nó inicial" />
             </VCol>
             <VCol cols="12" md="6">
               <VTextField v-model="rotaDestino" label="Nó destino" />
             </VCol>
-            <VCol cols="12">
-             <div class="d-flex flex-wrap gap-4 justify-sm-space-between justify-center">
-               <VBtn color="success" @click="encontrarMelhorRota(rotaInicio, rotaDestino)">
-               Melhor Rota
-              </VBtn>
-               <VBtn color="success" @click="encontrarMaiorRota(rotaInicio, rotaDestino)">
-                Maior Rota
-              </VBtn>
-             </div>
-            </VCol>
-      
-           
-          </VRow>
-        </VCardText>
-      </VCard>
-    </VCol>
+       <VCol cols="12">
+    <div class="d-flex flex-wrap gap-4 justify-sm-space-between justify-center">
+      <VBtn color="success" @click="encontrarMelhorRota(rotaInicio, rotaDestino)">
+        Melhor Rota
+      </VBtn>
+      <VBtn color="success" @click="encontrarMaiorRota(rotaInicio, rotaDestino)">
+        Maior Rota
+      </VBtn>
+    </div>
+  </VCol>
+    </VRow>
+  </VCard>
 
-    <VDataTable :items="listGraph" :headers="headers" hide-default-footer class="text-no-wrap rounded-t-0">
-      <template #item.nodeId="{ item }">
-        <span class="text-primary font-weight-semibold">#{{ item.nodeId }}</span>
-      </template>
 
-      <template #item.nodeLabel="{ item }">
-        <VTextField v-model="item.nodeLabel" hide-details dense solo
-          @change="updateNodeLabel(item.nodeId, item.nodeLabel)" />
-      </template>
+  <VCol>
+    <div ref="container" style="height: 400px; border: 1px solid #ccc; margin-top: 20px;"></div>
 
-      <template #item.edgeWeight="{ item }">
-        <VTextField v-model.number="item.edgeWeight" hide-details dense solo
-          @change="updateEdgeWeight(item.nodeId, item.edgeWeight)" />
-      </template>
-    </VDataTable>
-
-    <VCol cols="12">
-      <div id="cyt" style="height: 500px; border: 1px solid #ccc"></div>
-    </VCol>
-
-    <VCol cols="12">
-      <div class="flex flex-col gap-4 p-4">
-        <div ref="container" class="h-[400px] border rounded"></div>
-
-     
-
-      </div>
-    </VCol>
-  </VRow>
+  </VCol>
 </template>
-
 <script setup>
 import cytoscape from "cytoscape";
 import { onMounted, reactive, ref } from "vue";
 import { toast } from "vue3-toastify";
-
-let count = 0;
 const cy = ref(null);
-const rotaInicio = ref("");
-const rotaDestino = ref("");
+let count = 0;
+const container = ref(null);
 const selectedNodes = ref([]);
-const listGraph = ref([]);
-
-const headers = [
-  { title: "Id", key: "nodeId" },
-  { title: "Nome do nó", key: "nodeLabel" },
-  { title: "Peso", key: "edgeWeight" },
-];
-
 const graphData = reactive({
+  listAdjacecia: [],
   nodeId: "",
   nodeLabel: "",
   sourceId: "",
   targetId: "",
   edgeWeight: 0,
 });
-
-const updateNodeLabel = (id, newLabel) => {
-  const node = cy.value.getElementById(id);
-  if (node && node.length > 0) {
-    node.data("label", newLabel);
-  }
-};
-
-const updateEdgeWeight = (nodeId, newWeight) => {
-
-//1.filtra as arestas que estão conectadas ao nó especificado
-  const edges = cy.value.edges().filter((edge) =>
-    edge.source().id() === nodeId || edge.target().id() === nodeId
-   
-  );
-  
-
-//Atualizando o peso das arestas
-  edges.forEach((edge) => {
-    console.log("nó de inicio", edges.source().id() );
-  console.log("nó alvo", edges.target().id() );
-    edge.data("weight", newWeight);
-     edge.style('label', newWeight.toString()); 
-     console.log("novo peso:", edge.data("weight"));
-  });
-
-};
-
+const matrix = ref([
+  [0, 0],
+  [0, 0]
+]);
 onMounted(() => {
-
   cy.value = cytoscape({
-    container: document.getElementById("cyt"),
+    container: container.value,
     elements: [],
     style: [
       {
@@ -161,19 +90,19 @@ onMounted(() => {
           "text-halign": "center",
           width: 50,
           height: 50,
-        },
+        }
       },
       {
         selector: "edge",
         style: {
           label: "data(weight)",
           width: 3,
-            'label': 'data(weight)', 
+          'label': 'data(weight)',
           "line-color": "#888",
           "target-arrow-color": "#888",
           "target-arrow-shape": "triangle",
           "curve-style": "bezier",
-        },
+        }
       },
       {
         selector: ".highlight",
@@ -186,20 +115,20 @@ onMounted(() => {
         },
       },
       {
+
         selector: ".selected",
         style: {
           "border-width": 3,
           "border-color": "#FFD700",
           "border-style": "solid",
         },
-      },
+      }
     ],
     layout: {
       name: "cose",
       animate: true,
-    },
+    }
   });
-
   cy.value.on("tap", (event) => {
     const target = event.target;
 
@@ -233,7 +162,7 @@ onMounted(() => {
         });
 
         selectedNodes.value = [];
-    
+
       }
     } else {
       const pos = event.position || event.renderedPosition;
@@ -245,77 +174,65 @@ onMounted(() => {
         group: "nodes",
         data: {
           id: newNodeId,
-          label: graphData.nodeLabel,
-
+          label: graphData.nodeLabel|| newNodeId,
           color: "#7B61FF",
         },
         position: { x: pos.x, y: pos.y },
       });
 
-      listGraph.value.push({
-        nodeId: newNodeId,
-        nodeLabel: graphData.nodeLabel,
-        edgeWeight: 1,
-      });
-   
- 
+
     }
 
   });
 });
+function generateGraphFromMatrix() {
+  if (!cy.value) return;
+  cy.value.elements().remove(); // limpa grafo anterior
 
-function submit() {
-  // Validação para evitar duplicatas e campos vazios
-  if (graphData.nodeId && graphData.nodeLabel) {
-    if (cy.value.getElementById(graphData.nodeId).length === 0) {
-      cy.value.add({
-        group: "nodes",
-        data: {
-          id: graphData.nodeId,
-          label: graphData.nodeLabel,
-          color: "#7B61FF",
-        },
-      });
+  const size = matrix.value.length;
 
-      listGraph.value.push({
-        nodeId: graphData.nodeId,
-        nodeLabel: graphData.nodeLabel,
-        edgeWeight: graphData.edgeWeight || 1,
-      });
-    } else {
-      toast.warning("Nó com este ID já existe.");
+  // Adiciona nós
+  const nodes = Array.from({ length: size }, (_, i) => ({
+    data: { id: `${i}` }
+  }));
+
+  // Adiciona arestas com base na matriz
+  const edges = [];
+  for (let i = 0; i < size; i++) {
+    for (let j = 0; j < size; j++) {
+      const weight = matrix.value[i][j];
+      if (weight !== 0) {
+        edges.push({
+          data: {
+            id: `${i}-${j}`,
+            source: `${i}`,
+            target: `${j}`,
+            weight
+          }
+        });
+      }
     }
   }
 
-  if (graphData.sourceId && graphData.targetId) {
-    const edgeId = [graphData.sourceId, graphData.targetId].sort().join("-");
-    if (cy.value.getElementById(edgeId).length === 0) {
-      cy.value.add({
-        group: "edges",
-        data: {
-          id: edgeId,
-          source: graphData.sourceId,
-          target: graphData.targetId,
-          weight: graphData.edgeWeight || 1,
-        },
-      });
-    } else {
-      toast.warning("Aresta já existe.");
-    }
-  }
+  cy.value.add([...nodes, ...edges]);
 
-  cy.value.layout({ name: "cose", animate: true }).run();
-
-
-
-  // Limpa campos
-  graphData.nodeId = "";
-  graphData.nodeLabel = "";
-  graphData.sourceId = "";
-  graphData.targetId = "";
-  graphData.edgeWeight = 1;
+  // Layout automático
+  cy.value.layout({ name: "circle" }).run();
 }
 
+function editCell(row, col) {
+  const newValue = parseInt(prompt(`Novo valor para [${row}][${col}]`, matrix.value[row][col]));
+  if (!isNaN(newValue)) {
+    matrix.value[row][col] = newValue;
+  }
+}
+
+function addVertex() {
+  const newSize = matrix.value.length + 1;
+  matrix.value.forEach(row => row.push(0));
+  matrix.value.push(Array(newSize).fill(0));
+
+}
 
 
 
@@ -407,4 +324,22 @@ function encontrarMaiorRota(inicio, destino) {
 
 }
 
+
 </script>
+<style>
+.matrix-cell {
+  display: inline-block;
+  width: 30px;
+  height: 30px;
+  line-height: 30px;
+  border: 1px solid #ccc;
+  text-align: center;
+  cursor: pointer;
+  margin: 2px;
+  background-color: #f9f9f9;
+}
+
+.matrix-cell:hover {
+  background-color: #e0e0e0;
+}
+</style>
