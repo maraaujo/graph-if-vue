@@ -1,6 +1,6 @@
 <template>
   <VRow>
-    <!-- Matriz de Adjacência -->
+
     <VCol cols="12">
       <VCard title="Gerar grafo através de uma matriz">
         <VCardText>
@@ -30,7 +30,7 @@
       <VBtn @click="generateGraphFromMatrix" color="success">Gerar Grafo</VBtn>
     </VCol>
 
-    <!-- Diálogo para editar label -->
+
     <VDialog v-model="dialogeditarLabelNo" max-width="400">
       <VCard>
         <VCardTitle class="text-h6">Editar Label</VCardTitle>
@@ -45,7 +45,7 @@
       </VCard>
     </VDialog>
 
-    <!-- Diálogo para excluir nó -->
+
     <VDialog v-model="dialogExcluirNo" max-width="400">
       <VCard>
         <VCardTitle class="text-h6">Excluir Nó</VCardTitle>
@@ -85,7 +85,6 @@
       </VCard>
     </VCol>
 
-    <!-- Container do grafo -->
     <VCol cols="12">
       <div ref="container" style="height: 500px; border: 1px solid #ccc"></div>
     </VCol>
@@ -207,8 +206,7 @@ function exportarGrafoJson() {
   URL.revokeObjectURL(url);
 }
 
-// As funções de encontrarMelhorRota, encontrarTodasRotas, encontrarMaiorRota
-// são as mesmas que você já tem — me avise se quiser que eu cole todas aqui também
+
 
 onMounted(() => {
   cy.value = cytoscape({
@@ -264,7 +262,7 @@ onMounted(() => {
     const clicked = event.target;
 
     if (clicked === cy.value) {
-      // Clique em espaço vazio: cria novo nó
+
       const pos = event.position;
       const id = `${count.value}`;
       count.value++;
@@ -275,14 +273,14 @@ onMounted(() => {
         position: pos,
       });
 
-      // Atualiza matriz
+   
       matrix.value.forEach((row) => row.push(0));
       matrix.value.push(new Array(matrix.value.length + 1).fill(0));
 
     } else if (clicked.isNode && clicked.isNode()) {
       const nodeId = clicked.id();
 
-      // Adiciona nó à seleção para criar aresta
+   
       if (!selectedNodes.value.includes(nodeId)) {
         clicked.addClass("selected");
         selectedNodes.value.push(nodeId);
@@ -307,7 +305,7 @@ onMounted(() => {
         selectedNodes.value = [];
       }
 
-      // Abre diálogo para editar label
+    
       noSelecionadoParaLabel.value = clicked;
       noSelecionadoParaLabelLabel.value = clicked.data("label");
       dialogeditarLabelNo.value = true;
@@ -315,7 +313,7 @@ onMounted(() => {
   });
 
   cy.value.on("cxttap", "node", (event) => {
-    // Clique com botão direito em nó: abre diálogo para excluir
+    
     noSelecionado.value = event.target;
     dialogExcluirNo.value = true;
   });
