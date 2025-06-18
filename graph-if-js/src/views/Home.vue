@@ -316,12 +316,16 @@ function encontrarMaiorRota(inicio, destino) {
     visitados.delete(atual);
   }
 
-  dfs(inicio, [startNode], 0);
-
-  if (maiorCaminho.length === 0) {
-    toast.warning("Rota não encontrada.");
-    return;
-  }
+const cy = ref(null)
+const rotaInicio = ref('')
+const rotaDestino = ref('')
+const selectedNodes = ref([])
+const listGraph = ref([])
+var count = 0;
+const headers = [
+  { title: "Id", key: "nodeId", sortable: true },
+  { title: "Nome do nó", key: "nodeLabel", sortable: true },
+]
 
   cy.value.edges().removeClass("highlight");
   cy.value.nodes().removeClass("highlight");
@@ -426,14 +430,39 @@ if (!isNaN(i) && !isNaN(j)) {
           cy.value.getElementById(id).removeClass("selected");
         });
 
-        selectedNodes.value = [];
-    
-      }
-    } else {
-      const pos = event.position || event.renderedPosition;
-      const newNodeId = "n" + count++;
+      selectedNodes.value = [];
+    }
 
-      const label = graphData.nodeLabel || newNodeId;
+  // Clique no plano de fundo (não é nó nem aresta)
+  } else {
+    const pos = event.position || event.renderedPosition;
+
+    // Gera um ID único (opcionalmente usando timestamp)
+    const newId = 'n' + Date.now();
+
+    cy.value.add({
+      group: 'nodes',
+      data: { id: newId, label: graphData.nodeLabel},
+      color: '#7B61FF',
+      position: { x: pos.x, y: pos.y }
+    });
+     listGraph.value.push({
+      nodeId: newId,
+      nodeLabel: graphData.nodeLabel,
+    })
+  }
+});
+
+
+})
+
+
+// })
+
+function submit() {
+  const hasNode = graphData.nodeId && graphData.nodeLabel && !cy.value.getElementById(graphData.nodeId).length
+  const hasEdge = graphData.sourceId && graphData.targetId &&
+    !cy.value.getElementById([graphData.sourceId, graphData.targetId].sort().join('-')).length
 
       cy.value.add({
         group: "nodes",
