@@ -9,9 +9,5 @@ export default [
      
     // ],
   },
-  {
-    name: 'Matriz de Adjacência',
-    icon: 'mdi-matrix',
-    to: { name: 'listAdj' },
-  },
+
 ]

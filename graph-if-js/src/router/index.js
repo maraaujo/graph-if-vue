@@ -15,14 +15,7 @@ const router = createRouter({
         layout: 'content',
       },
     },
-       {
-      path: '/matrix',
-      name: 'listAdj',
-      component: () => import('@/views/listAdj.vue'),
-      meta: {
-        layout: 'content',
-      },
-    },
+ 
    
   ],
 })

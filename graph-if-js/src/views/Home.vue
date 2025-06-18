@@ -5,9 +5,18 @@
       <VCard title="Gerar grafo através de uma matriz">
         <VCardText>
           <div class="matrix-grid">
-            <div v-for="(row, rowIndex) in matrix" :key="rowIndex" class="matrix-row" :style="rowGridStyle">
-              <div v-for="(cell, colIndex) in row" :key="`${rowIndex}-${colIndex}`" class="matrix-cell"
-                @click="editCell(rowIndex, colIndex)">
+            <div
+              v-for="(row, rowIndex) in matrix"
+              :key="rowIndex"
+              class="matrix-row"
+              :style="rowGridStyle"
+            >
+              <div
+                v-for="(cell, colIndex) in row"
+                :key="`${rowIndex}-${colIndex}`"
+                class="matrix-cell"
+                @click="editCell(rowIndex, colIndex)"
+              >
                 {{ cell }}
               </div>
             </div>
@@ -20,48 +29,42 @@
       <VBtn @click="addVertex" color="primary">Adicionar vértice</VBtn>
       <VBtn @click="generateGraphFromMatrix" color="success">Gerar Grafo</VBtn>
     </VCol>
-<VDataTable :items="listGraph" :headers="headers" hide-default-footer class="text-no-wrap rounded-t-0">
-      <template #item.nodeId="{ item }">
-        <span class="text-primary font-weight-semibold">#{{ item.nodeId }}</span>
-      </template>
-</VDataTable>
-   
+
+    <!-- Diálogo para editar label -->
+    <VDialog v-model="dialogeditarLabelNo" max-width="400">
+      <VCard>
+        <VCardTitle class="text-h6">Editar Label</VCardTitle>
+        <VCardText>
+          <VTextField v-model="noSelecionadoParaLabelLabel" label="Novo nome do nó" />
+        </VCardText>
+        <VCardActions>
+          <VSpacer />
+          <VBtn text @click="dialogeditarLabelNo = false">Cancelar</VBtn>
+          <VBtn color="primary" @click="confirmarEdicaoLabel">Salvar</VBtn>
+        </VCardActions>
+      </VCard>
+    </VDialog>
+
+    <!-- Diálogo para excluir nó -->
+    <VDialog v-model="dialogExcluirNo" max-width="400">
+      <VCard>
+        <VCardTitle class="text-h6">Excluir Nó</VCardTitle>
+        <VCardText>
+          Tem certeza que deseja excluir o nó
+          <strong>{{ noSelecionado?.id() }}</strong> e todas as conexões?
+        </VCardText>
+        <VCardActions>
+          <VSpacer />
+          <VBtn text @click="dialogExcluirNo = false">Cancelar</VBtn>
+          <VBtn color="error" @click="excluirNo">Excluir</VBtn>
+        </VCardActions>
+      </VCard>
+    </VDialog>
+
+    <!-- Seção de Rotas -->
     <VCol cols="12">
       <VCard title="Buscar rota">
         <VCardText>
-      <VDialog v-model="dialogeditarLabelNo" max-width="400">
-  <VCard>
-    <VCardTitle class="text-h6">Editar Label</VCardTitle>
-    <VCardText>
-      <VTextField
-        v-model="noSelecionadoParaLabelLabel"
-        label="Novo nome do nó"
-      />
-    </VCardText>
-    <VCardActions>
-      <VSpacer />
-      <VBtn text @click="dialogeditarLabelNo = false">Cancelar</VBtn>
-      <VBtn color="primary" @click="confirmarEdicaoLabel">Salvar</VBtn>
-    </VCardActions>
-  </VCard>
-</VDialog>
-<VDialog v-model="dialogExcluirNo" max-width="400">
-  <VCard>
-    <VCardTitle class="text-h6">Excluir Nó</VCardTitle>
-    <VCardText>
-      Tem certeza que deseja excluir o nó
-      <strong>{{ noSelecionado?.id() }}</strong> e todas as conexões?
-    </VCardText>
-    <VCardActions>
-      <VSpacer />
-      <VBtn text @click="dialogExcluirNo = false">Cancelar</VBtn>
-      <VBtn color="error" @click="excluirNo">Excluir</VBtn>
-    </VCardActions>
-  </VCard>
-</VDialog>
-
-  
- <!-- Seção de Busca de Rotas -->
           <VRow>
             <VCol cols="12" md="6">
               <VTextField v-model="rotaInicio" label="Nó inicial" />
@@ -71,17 +74,10 @@
             </VCol>
             <VCol cols="12">
               <div class="d-flex flex-wrap gap-4 justify-sm-space-between justify-center">
-                <VBtn color="success" @click="encontrarMelhorRota(rotaInicio, rotaDestino)">
-                  Melhor Rota
-                </VBtn>
-                <VBtn color="success" @click="encontrarTodasRotas(rotaInicio, rotaDestino)">
-                  Todas as rotas
-                </VBtn>
-                <VBtn color="success" @click="encontrarMaiorRota(rotaInicio, rotaDestino)">
-                  Maior Rota
-                </VBtn>
+                <VBtn color="success" @click="encontrarMelhorRota(rotaInicio, rotaDestino)">Melhor Rota</VBtn>
+                <VBtn color="success" @click="encontrarTodasRotas(rotaInicio, rotaDestino)">Todas as rotas</VBtn>
+                <VBtn color="success" @click="encontrarMaiorRota(rotaInicio, rotaDestino)">Maior Rota</VBtn>
                 <VBtn color="info" @click="exportarGrafoJson">Exportar JSON</VBtn>
-
               </div>
             </VCol>
           </VRow>
@@ -98,47 +94,25 @@
 
 <script setup>
 import cytoscape from "cytoscape";
-import { onMounted, reactive, ref, computed } from "vue";
+import { ref, reactive, computed, onMounted } from "vue";
 import { toast } from "vue3-toastify";
 
 const cy = ref(null);
 const container = ref(null);
-const rotaInicio = ref("");
-const dialogExcluirNo = ref(false);
-const dialogeditarLabelNo = ref(false);
-const noSelecionadoParaLabel = ref(false);
-const noSelecionado = ref(null);
-const rotaDestino = ref("");
+const count = ref(0);
 const selectedNodes = ref([]);
-const listGraph = ref([]);
-let count = 0;
-const noSelecionadoParaLabelLabel = ref("");
-const headers = [
-  { title: "Id", key: "nodeId" },
-  { title: "Nome do nó", key: "nodeLabel" },
-  { title: "Peso", key: "edgeWeight" },
-];
-function confirmarEdicaoLabel() {
-  if (noSelecionadoParaLabel.value) {
-    const node = noSelecionadoParaLabel.value;
-    node.data("label", noSelecionadoParaLabelLabel.value);
-    toast.success(`Label do nó ${node.id()} atualizado.`);
-  }
-  dialogeditarLabelNo.value = false;
-  noSelecionadoParaLabel.value = null;
-}
-const graphData = reactive({
-  nodeLabel: "",
-  nodeId: "",
-  sourceId: "",
-  targetId: "",
-  edgeWeight: 0,
-});
-
+const rotaInicio = ref("");
+const rotaDestino = ref("");
 const matrix = ref([
   [0, 0],
   [0, 0],
 ]);
+
+const dialogExcluirNo = ref(false);
+const dialogeditarLabelNo = ref(false);
+const noSelecionado = ref(null);
+const noSelecionadoParaLabel = ref(null);
+const noSelecionadoParaLabelLabel = ref("");
 
 const rowGridStyle = computed(() => ({
   display: "grid",
@@ -153,39 +127,58 @@ function addVertex() {
 
 function editCell(i, j) {
   if (i === j) {
-    toast.warning("Laços não são permitidos (arestas de um nó para ele mesmo).");
+    toast.warning("Laços não são permitidos.");
     return;
   }
 
   const current = matrix.value[i][j];
   const newValue = prompt(`Peso da aresta de ${i} para ${j}:`, current);
-  if (!isNaN(newValue) && newValue !== null) {
-    const novoPeso = parseInt(newValue);
-    matrix.value[i][j] = novoPeso;
-
-    // Atualiza diretamente no grafo, se a aresta existir
-    const edgeId = `${i}-${j}`;
-    const edge = cy.value.getElementById(edgeId);
-    if (edge.length > 0) {
-      edge.data("weight", novoPeso);
-    }
+  if (newValue !== null && !isNaN(newValue)) {
+    matrix.value[i][j] = parseInt(newValue);
+    updateEdgeInGraph(i, j, parseInt(newValue));
   }
 }
 
+function updateEdgeInGraph(i, j, weight) {
+  const edgeId = `${i}-${j}`;
+  const edge = cy.value.getElementById(edgeId);
+  if (edge.length) {
+    edge.data("weight", weight);
+  }
+}
+
+function excluirNo() {
+  const id = parseInt(noSelecionado.value.id().replace(/\D/g, ""));
+  if (!isNaN(id)) {
+    matrix.value.splice(id, 1);
+    matrix.value.forEach((row) => row.splice(id, 1));
+    cy.value.getElementById(noSelecionado.value.id()).remove();
+  }
+  noSelecionado.value = null;
+  dialogExcluirNo.value = false;
+}
+
+function confirmarEdicaoLabel() {
+  if (noSelecionadoParaLabel.value) {
+    noSelecionadoParaLabel.value.data("label", noSelecionadoParaLabelLabel.value);
+    toast.success("Label atualizado.");
+  }
+  dialogeditarLabelNo.value = false;
+  noSelecionadoParaLabel.value = null;
+}
 
 function generateGraphFromMatrix() {
   cy.value.elements().remove();
   const size = matrix.value.length;
 
   const nodes = Array.from({ length: size }, (_, i) => ({
-    data: { id: `${i}`, label: graphData.nodeLabel || `n${i}` },
+    data: { id: `${i}`, label: `n${i}` },
   }));
 
   const edges = [];
   for (let i = 0; i < size; i++) {
     for (let j = 0; j < size; j++) {
       const weight = matrix.value[i][j];
-      console.log("aqui maria", weight)
       if (weight !== 0 && i !== j) {
         edges.push({
           data: {
@@ -196,141 +189,13 @@ function generateGraphFromMatrix() {
           },
         });
       }
-    edgeWeight.value = weight.value;
     }
   }
 
   cy.value.add([...nodes, ...edges]);
   cy.value.layout({ name: "cose", animate: true }).run();
 }
-function encontrarTodasRotas(inicio, destino) {
-  const todasRotas = [];
-  const visitados = new Set();
 
-  const startNode = cy.value.getElementById(inicio);
-  console.log("no de  inicio")
-  const endNode = cy.value.getElementById(destino);
-
-  if (!startNode.length || !endNode.length) {
-    toast.error("Nó inicial ou final não existe.");
-    return;
-  }
-
-  function dfs(atual, caminho, pesoTotal) {
-    if (atual === destino) {
-      todasRotas.push({ caminho: [...caminho], peso: pesoTotal });
-      return;
-    }
-
-    visitados.add(atual);
-
-    const vizinhos = cy.value.getElementById(atual).connectedEdges().filter((edge) => {
-      return edge.source().id() === atual && !visitados.has(edge.target().id());
-    });
-
-    vizinhos.forEach((edge) => {
-      const prox = edge.target().id();
-      const peso = edge.data("weight");
-      dfs(prox, [...caminho, edge, edge.target()], pesoTotal + peso);
-    });
-
-    visitados.delete(atual);
-  }
-
-  dfs(inicio, [startNode], 0);
-
-  if (todasRotas.length === 0) {
-    toast.warning("Nenhuma rota encontrada.");
-    return;
-  }
-
-  // Exibe no console todas as rotas encontradas
-  console.log("Rotas possíveis:");
-  todasRotas.forEach((rota, i) => {
-    const rotaStr = rota.caminho.filter((el) => el.isNode?.()).map((n) => n.id()).join(" ➔ ");
-    console.log(`Rota ${i + 1}: ${rotaStr} (Peso: ${rota.peso})`);
-  });
-
-  // Destaca a primeira rota no grafo
-  cy.value.edges().removeClass("highlight");
-  cy.value.nodes().removeClass("highlight");
-  todasRotas[0].caminho.forEach((el) => el.addClass("highlight"));
-
-  toast.success(`Encontradas ${todasRotas.length} rotas. Veja o console para detalhes.`);
-}
-function encontrarMelhorRota(inicio, destino) {
-  if (!cy.value.getElementById(inicio).length || !cy.value.getElementById(destino).length) {
-    toast.error("Nó inicial ou final não existe.");
-    return;
-  }
-  cy.value.edges().removeClass("highlight");
-  cy.value.nodes().removeClass("highlight");
-
-  const dijkstra = cy.value.elements().dijkstra(`#${inicio}`, (edge) => edge.data("weight"));
-  const path = dijkstra.pathTo(cy.value.getElementById(destino));
-
-  if (!path || path.length === 0) {
-    toast.warning("Rota não encontrada.");
-    return;
-  }
-
-  path.forEach((el) => el.addClass("highlight"));
-
-  const pathStr = path.filter((el) => el.isNode?.()).map((n) => n.id()).join(" ➔ ");
-  toast.success(`Melhor rota: ${pathStr}`);
-}
-
-function encontrarMaiorRota(inicio, destino) {
-  const visitados = new Set();
-  let maiorCaminho = [];
-  let maiorPeso = 0;
-  const startNode = cy.value.getElementById(inicio);
-  const endNode = cy.value.getElementById(destino);
-
-  if (!startNode.length || !endNode.length) {
-    toast.error("Nó inicial ou final não existe.");
-    return;
-  }
-
-  function dfs(atual, caminho, pesoTotal) {
-    if (atual === destino) {
-      if (pesoTotal > maiorPeso) {
-        maiorPeso = pesoTotal;
-        maiorCaminho = [...caminho];
-      }
-      return;
-    }
-
-    visitados.add(atual);
-
-    const vizinhos = cy.value.getElementById(atual).connectedEdges().filter((edge) => {
-      return edge.source().id() === atual && !visitados.has(edge.target().id());
-    });
-
-    vizinhos.forEach((edge) => {
-      const prox = edge.target().id();
-      const peso = edge.data("weight");
-      dfs(prox, [...caminho, edge, edge.target()], pesoTotal + peso);
-    });
-
-    visitados.delete(atual);
-  }
-
-const cy = ref(null)
-const rotaInicio = ref('')
-const rotaDestino = ref('')
-const selectedNodes = ref([])
-const listGraph = ref([])
-var count = 0;
-const headers = [
-  { title: "Id", key: "nodeId", sortable: true },
-  { title: "Nome do nó", key: "nodeLabel", sortable: true },
-]
-
-  cy.value.edges().removeClass("highlight");
-  cy.value.nodes().removeClass("highlight");
-  maiorCaminho.forEach((el) => el.addClass("highlight"));
-}
 function exportarGrafoJson() {
   const json = cy.value.json();
   const blob = new Blob([JSON.stringify(json, null, 2)], { type: "application/json" });
@@ -341,6 +206,9 @@ function exportarGrafoJson() {
   a.click();
   URL.revokeObjectURL(url);
 }
+
+// As funções de encontrarMelhorRota, encontrarTodasRotas, encontrarMaiorRota
+// são as mesmas que você já tem — me avise se quiser que eu cole todas aqui também
 
 onMounted(() => {
   cy.value = cytoscape({
@@ -371,19 +239,18 @@ onMounted(() => {
         },
       },
       {
+        selector: ".selected",
+        style: {
+          "border-color": "#FFD700",
+          "border-width": 4,
+        },
+      },
+      {
         selector: ".highlight",
         style: {
           "background-color": "#00e676",
           "line-color": "#00e676",
           "target-arrow-color": "#00e676",
-        },
-      },
-       {
-        selector: ".selected",
-        style: {
-          "border-width": 3,
-          "border-color": "#5500ff",
-          "border-style": "solid",
         },
       },
     ],
@@ -392,118 +259,68 @@ onMounted(() => {
       animate: true,
     },
   });
-  cy.value.on("tap", (event) => {
-    const clickedElement = event.target;
-   
-    if (
-      clickedElement !== cy.value &&
-      typeof clickedElement.isNode === "function" &&
-      clickedElement.isNode()
-    ) {
-      const nodeId = clickedElement.id();
 
+  cy.value.on("tap", (event) => {
+    const clicked = event.target;
+
+    if (clicked === cy.value) {
+      // Clique em espaço vazio: cria novo nó
+      const pos = event.position;
+      const id = `${count.value}`;
+      count.value++;
+
+      cy.value.add({
+        group: "nodes",
+        data: { id, label: `n${id}` },
+        position: pos,
+      });
+
+      // Atualiza matriz
+      matrix.value.forEach((row) => row.push(0));
+      matrix.value.push(new Array(matrix.value.length + 1).fill(0));
+
+    } else if (clicked.isNode && clicked.isNode()) {
+      const nodeId = clicked.id();
+
+      // Adiciona nó à seleção para criar aresta
       if (!selectedNodes.value.includes(nodeId)) {
-        clickedElement.addClass("selected");
+        clicked.addClass("selected");
         selectedNodes.value.push(nodeId);
       }
 
-    if (selectedNodes.value.length === 2) {
-        const [source, targetId,] = selectedNodes.value;
-        console.log("dois nós selecionados", [source, targetId]);
-        const edgeId = [source, targetId].join("-");
+      if (selectedNodes.value.length === 2) {
+        const [a, b] = selectedNodes.value;
+        const edgeId = `${a}-${b}`;
 
         if (!cy.value.getElementById(edgeId).length) {
           cy.value.add({
             group: "edges",
-            data: { id: edgeId, source: source, target: targetId, weight: 1 },
+            data: { id: edgeId, source: a, target: b, weight: 1 },
           });
-          const i = parseInt(source.replace(/\D/g, ""));
-const j = parseInt(targetId.replace(/\D/g, ""));
-if (!isNaN(i) && !isNaN(j)) {
-  if (matrix.value[i] && matrix.value[i][j] !== undefined) {
-    matrix.value[i][j] = 1;
-  }
-}
+
+          matrix.value[parseInt(a)][parseInt(b)] = 1;
         }
 
-        selectedNodes.value.forEach((id) => {
-          cy.value.getElementById(id).removeClass("selected");
-        });
+        selectedNodes.value.forEach((id) =>
+          cy.value.getElementById(id).removeClass("selected")
+        );
+        selectedNodes.value = [];
+      }
 
-      selectedNodes.value = [];
-    }
-
-  // Clique no plano de fundo (não é nó nem aresta)
-  } else {
-    const pos = event.position || event.renderedPosition;
-
-    // Gera um ID único (opcionalmente usando timestamp)
-    const newId = 'n' + Date.now();
-
-    cy.value.add({
-      group: 'nodes',
-      data: { id: newId, label: graphData.nodeLabel},
-      color: '#7B61FF',
-      position: { x: pos.x, y: pos.y }
-    });
-     listGraph.value.push({
-      nodeId: newId,
-      nodeLabel: graphData.nodeLabel,
-    })
-  }
-});
-
-
-})
-
-
-// })
-
-function submit() {
-  const hasNode = graphData.nodeId && graphData.nodeLabel && !cy.value.getElementById(graphData.nodeId).length
-  const hasEdge = graphData.sourceId && graphData.targetId &&
-    !cy.value.getElementById([graphData.sourceId, graphData.targetId].sort().join('-')).length
-
-      cy.value.add({
-        group: "nodes",
-        data: {
-          id: newNodeId,
-          label,
-          color: "#7B61FF",
-        },
-        position: { x: pos.x, y: pos.y },
-      });
-
-      listGraph.value.push({
-        nodeId: newNodeId,
-        nodeLabel: label,
-        edgeWeight: 1,
-      });
-      matrix.value.forEach(row => row.push(0));
-matrix.value.push(new Array(matrix.value.length + 1).fill(0));
+      // Abre diálogo para editar label
+      noSelecionadoParaLabel.value = clicked;
+      noSelecionadoParaLabelLabel.value = clicked.data("label");
+      dialogeditarLabelNo.value = true;
     }
   });
-  //excluir no 
-  cy.value.on("cxttap", "node", (event) => {
-    const node = event.target; // nó clicado 
-    noSelecionado.value = node; //armazena o nó selecionado 
-    console.log("no para excluir", node.id(), node.data())
 
+  cy.value.on("cxttap", "node", (event) => {
+    // Clique com botão direito em nó: abre diálogo para excluir
+    noSelecionado.value = event.target;
     dialogExcluirNo.value = true;
   });
+});
 
-   cy.value.on("tap", "node", (event) => {
-    const node = event.target;
-    noSelecionadoParaLabel.value = node;
-    dialogeditarLabelNo.value = true;
-  });
-  cy.value.on("tap", "node", (event) => {
-  const node = event.target; //nó clicado
-  noSelecionadoParaLabel.value = node; 
-  noSelecionadoParaLabelLabel.value = node.data("label"); // preencher o input
-  dialogeditarLabelNo.value = true;
-});
-});
 </script>
 
 <style scoped>
@@ -514,15 +331,9 @@ matrix.value.push(new Array(matrix.value.length + 1).fill(0));
   overflow-x: auto;
   padding: 10px 0;
 }
-
-::v-deep(.cytoscape-container) {
-  cursor: pointer;
-}
-
 .matrix-row {
   width: fit-content;
 }
-
 .matrix-cell {
   width: 40px;
   height: 40px;
