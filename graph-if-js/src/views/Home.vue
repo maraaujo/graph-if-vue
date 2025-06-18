@@ -1,42 +1,67 @@
 <template>
   <VRow>
+    <!-- Matriz de Adjacência -->
     <VCol cols="12">
-      <VCard title="Grafo com Rota e Peso">
+      <VCard title="Gerar grafo através de uma matriz">
         <VCardText>
-          <VForm @submit.prevent="submit">
-            <VRow>
-              <VCol cols="12" md="4">
-                <VTextField v-model="graphData.nodeId" label="ID do nó" />
-              </VCol>
-
-              <VCol cols="12" md="4">
-                <VTextField v-model="graphData.nodeLabel" label="Rótulo do nó" />
-              </VCol>
-
-              <VCol cols="12" md="4">
-                <VTextField v-model.number="graphData.edgeWeight" label="Peso da aresta" type="number" />
-              </VCol>
-
-              <VCol cols="12" md="6">
-                <VTextField v-model="graphData.sourceId" label="Nó de origem" />
-              </VCol>
-
-              <VCol cols="12" md="6">
-                <VTextField v-model="graphData.targetId" label="Nó de destino" />
-              </VCol>
-            </VRow>
-          </VForm>
+          <div class="matrix-grid">
+            <div v-for="(row, rowIndex) in matrix" :key="rowIndex" class="matrix-row" :style="rowGridStyle">
+              <div v-for="(cell, colIndex) in row" :key="`${rowIndex}-${colIndex}`" class="matrix-cell"
+                @click="editCell(rowIndex, colIndex)">
+                {{ cell }}
+              </div>
+            </div>
+          </div>
         </VCardText>
       </VCard>
     </VCol>
-      
-     <VCol cols="12" class="d-flex justify-end">
-      <VBtn color="primary" @click="submit">Criar</VBtn>
-    </VCol>
 
+    <VCol cols="12" class="d-flex flex-wrap gap-4 justify-sm-space-between justify-center">
+      <VBtn @click="addVertex" color="primary">Adicionar vértice</VBtn>
+      <VBtn @click="generateGraphFromMatrix" color="success">Gerar Grafo</VBtn>
+    </VCol>
+<VDataTable :items="listGraph" :headers="headers" hide-default-footer class="text-no-wrap rounded-t-0">
+      <template #item.nodeId="{ item }">
+        <span class="text-primary font-weight-semibold">#{{ item.nodeId }}</span>
+      </template>
+</VDataTable>
+   
     <VCol cols="12">
-      <VCard title="Buscar melhor rota">
+      <VCard title="Buscar rota">
         <VCardText>
+      <VDialog v-model="dialogeditarLabelNo" max-width="400">
+  <VCard>
+    <VCardTitle class="text-h6">Editar Label</VCardTitle>
+    <VCardText>
+      <VTextField
+        v-model="noSelecionadoParaLabelLabel"
+        label="Novo nome do nó"
+      />
+    </VCardText>
+    <VCardActions>
+      <VSpacer />
+      <VBtn text @click="dialogeditarLabelNo = false">Cancelar</VBtn>
+      <VBtn color="primary" @click="confirmarEdicaoLabel">Salvar</VBtn>
+    </VCardActions>
+  </VCard>
+</VDialog>
+<VDialog v-model="dialogExcluirNo" max-width="400">
+  <VCard>
+    <VCardTitle class="text-h6">Excluir Nó</VCardTitle>
+    <VCardText>
+      Tem certeza que deseja excluir o nó
+      <strong>{{ noSelecionado?.id() }}</strong> e todas as conexões?
+    </VCardText>
+    <VCardActions>
+      <VSpacer />
+      <VBtn text @click="dialogExcluirNo = false">Cancelar</VBtn>
+      <VBtn color="error" @click="excluirNo">Excluir</VBtn>
+    </VCardActions>
+  </VCard>
+</VDialog>
+
+  
+ <!-- Seção de Busca de Rotas -->
           <VRow>
             <VCol cols="12" md="6">
               <VTextField v-model="rotaInicio" label="Nó inicial" />
@@ -45,110 +70,277 @@
               <VTextField v-model="rotaDestino" label="Nó destino" />
             </VCol>
             <VCol cols="12">
-             <div class="d-flex flex-wrap gap-4 justify-sm-space-between justify-center">
-               <VBtn color="success" @click="encontrarMelhorRota(rotaInicio, rotaDestino)">
-               Melhor Rota
-              </VBtn>
-               <VBtn color="success" @click="encontrarMaiorRota(rotaInicio, rotaDestino)">
-                Maior Rota
-              </VBtn>
-             </div>
+              <div class="d-flex flex-wrap gap-4 justify-sm-space-between justify-center">
+                <VBtn color="success" @click="encontrarMelhorRota(rotaInicio, rotaDestino)">
+                  Melhor Rota
+                </VBtn>
+                <VBtn color="success" @click="encontrarTodasRotas(rotaInicio, rotaDestino)">
+                  Todas as rotas
+                </VBtn>
+                <VBtn color="success" @click="encontrarMaiorRota(rotaInicio, rotaDestino)">
+                  Maior Rota
+                </VBtn>
+                <VBtn color="info" @click="exportarGrafoJson">Exportar JSON</VBtn>
+
+              </div>
             </VCol>
-      
-           
           </VRow>
         </VCardText>
       </VCard>
     </VCol>
 
-    <VDataTable :items="listGraph" :headers="headers" hide-default-footer class="text-no-wrap rounded-t-0">
-      <template #item.nodeId="{ item }">
-        <span class="text-primary font-weight-semibold">#{{ item.nodeId }}</span>
-      </template>
-
-      <template #item.nodeLabel="{ item }">
-        <VTextField v-model="item.nodeLabel" hide-details dense solo
-          @change="updateNodeLabel(item.nodeId, item.nodeLabel)" />
-      </template>
-
-      <template #item.edgeWeight="{ item }">
-        <VTextField v-model.number="item.edgeWeight" hide-details dense solo
-          @change="updateEdgeWeight(item.nodeId, item.edgeWeight)" />
-      </template>
-    </VDataTable>
-
+    <!-- Container do grafo -->
     <VCol cols="12">
-      <div id="cyt" style="height: 500px; border: 1px solid #ccc"></div>
-    </VCol>
-
-    <VCol cols="12">
-      <div class="flex flex-col gap-4 p-4">
-        <div ref="container" class="h-[400px] border rounded"></div>
-
-     
-
-      </div>
+      <div ref="container" style="height: 500px; border: 1px solid #ccc"></div>
     </VCol>
   </VRow>
 </template>
 
 <script setup>
 import cytoscape from "cytoscape";
-import { onMounted, reactive, ref } from "vue";
+import { onMounted, reactive, ref, computed } from "vue";
 import { toast } from "vue3-toastify";
 
-let count = 0;
 const cy = ref(null);
+const container = ref(null);
 const rotaInicio = ref("");
+const dialogExcluirNo = ref(false);
+const dialogeditarLabelNo = ref(false);
+const noSelecionadoParaLabel = ref(false);
+const noSelecionado = ref(null);
 const rotaDestino = ref("");
 const selectedNodes = ref([]);
 const listGraph = ref([]);
-
+let count = 0;
+const noSelecionadoParaLabelLabel = ref("");
 const headers = [
   { title: "Id", key: "nodeId" },
   { title: "Nome do nó", key: "nodeLabel" },
   { title: "Peso", key: "edgeWeight" },
 ];
-
+function confirmarEdicaoLabel() {
+  if (noSelecionadoParaLabel.value) {
+    const node = noSelecionadoParaLabel.value;
+    node.data("label", noSelecionadoParaLabelLabel.value);
+    toast.success(`Label do nó ${node.id()} atualizado.`);
+  }
+  dialogeditarLabelNo.value = false;
+  noSelecionadoParaLabel.value = null;
+}
 const graphData = reactive({
-  nodeId: "",
   nodeLabel: "",
+  nodeId: "",
   sourceId: "",
   targetId: "",
   edgeWeight: 0,
 });
 
-const updateNodeLabel = (id, newLabel) => {
-  const node = cy.value.getElementById(id);
-  if (node && node.length > 0) {
-    node.data("label", newLabel);
+const matrix = ref([
+  [0, 0],
+  [0, 0],
+]);
+
+const rowGridStyle = computed(() => ({
+  display: "grid",
+  gridTemplateColumns: `repeat(${matrix.value.length}, 40px)`,
+  gap: "5px",
+}));
+
+function addVertex() {
+  matrix.value.forEach((row) => row.push(0));
+  matrix.value.push(new Array(matrix.value.length + 1).fill(0));
+}
+
+function editCell(i, j) {
+  if (i === j) {
+    toast.warning("Laços não são permitidos (arestas de um nó para ele mesmo).");
+    return;
   }
-};
 
-const updateEdgeWeight = (nodeId, newWeight) => {
+  const current = matrix.value[i][j];
+  const newValue = prompt(`Peso da aresta de ${i} para ${j}:`, current);
+  if (!isNaN(newValue) && newValue !== null) {
+    const novoPeso = parseInt(newValue);
+    matrix.value[i][j] = novoPeso;
 
-//1.filtra as arestas que estão conectadas ao nó especificado
-  const edges = cy.value.edges().filter((edge) =>
-    edge.source().id() === nodeId || edge.target().id() === nodeId
-   
-  );
-  
+    // Atualiza diretamente no grafo, se a aresta existir
+    const edgeId = `${i}-${j}`;
+    const edge = cy.value.getElementById(edgeId);
+    if (edge.length > 0) {
+      edge.data("weight", novoPeso);
+    }
+  }
+}
 
-//Atualizando o peso das arestas
-  edges.forEach((edge) => {
-    console.log("nó de inicio", edges.source().id() );
-  console.log("nó alvo", edges.target().id() );
-    edge.data("weight", newWeight);
-     edge.style('label', newWeight.toString()); 
-     console.log("novo peso:", edge.data("weight"));
+
+function generateGraphFromMatrix() {
+  cy.value.elements().remove();
+  const size = matrix.value.length;
+
+  const nodes = Array.from({ length: size }, (_, i) => ({
+    data: { id: `${i}`, label: graphData.nodeLabel || `n${i}` },
+  }));
+
+  const edges = [];
+  for (let i = 0; i < size; i++) {
+    for (let j = 0; j < size; j++) {
+      const weight = matrix.value[i][j];
+      console.log("aqui maria", weight)
+      if (weight !== 0 && i !== j) {
+        edges.push({
+          data: {
+            id: `${i}-${j}`,
+            source: `${i}`,
+            target: `${j}`,
+            weight,
+          },
+        });
+      }
+    edgeWeight.value = weight.value;
+    }
+  }
+
+  cy.value.add([...nodes, ...edges]);
+  cy.value.layout({ name: "cose", animate: true }).run();
+}
+function encontrarTodasRotas(inicio, destino) {
+  const todasRotas = [];
+  const visitados = new Set();
+
+  const startNode = cy.value.getElementById(inicio);
+  console.log("no de  inicio")
+  const endNode = cy.value.getElementById(destino);
+
+  if (!startNode.length || !endNode.length) {
+    toast.error("Nó inicial ou final não existe.");
+    return;
+  }
+
+  function dfs(atual, caminho, pesoTotal) {
+    if (atual === destino) {
+      todasRotas.push({ caminho: [...caminho], peso: pesoTotal });
+      return;
+    }
+
+    visitados.add(atual);
+
+    const vizinhos = cy.value.getElementById(atual).connectedEdges().filter((edge) => {
+      return edge.source().id() === atual && !visitados.has(edge.target().id());
+    });
+
+    vizinhos.forEach((edge) => {
+      const prox = edge.target().id();
+      const peso = edge.data("weight");
+      dfs(prox, [...caminho, edge, edge.target()], pesoTotal + peso);
+    });
+
+    visitados.delete(atual);
+  }
+
+  dfs(inicio, [startNode], 0);
+
+  if (todasRotas.length === 0) {
+    toast.warning("Nenhuma rota encontrada.");
+    return;
+  }
+
+  // Exibe no console todas as rotas encontradas
+  console.log("Rotas possíveis:");
+  todasRotas.forEach((rota, i) => {
+    const rotaStr = rota.caminho.filter((el) => el.isNode?.()).map((n) => n.id()).join(" ➔ ");
+    console.log(`Rota ${i + 1}: ${rotaStr} (Peso: ${rota.peso})`);
   });
 
-};
+  // Destaca a primeira rota no grafo
+  cy.value.edges().removeClass("highlight");
+  cy.value.nodes().removeClass("highlight");
+  todasRotas[0].caminho.forEach((el) => el.addClass("highlight"));
+
+  toast.success(`Encontradas ${todasRotas.length} rotas. Veja o console para detalhes.`);
+}
+function encontrarMelhorRota(inicio, destino) {
+  if (!cy.value.getElementById(inicio).length || !cy.value.getElementById(destino).length) {
+    toast.error("Nó inicial ou final não existe.");
+    return;
+  }
+  cy.value.edges().removeClass("highlight");
+  cy.value.nodes().removeClass("highlight");
+
+  const dijkstra = cy.value.elements().dijkstra(`#${inicio}`, (edge) => edge.data("weight"));
+  const path = dijkstra.pathTo(cy.value.getElementById(destino));
+
+  if (!path || path.length === 0) {
+    toast.warning("Rota não encontrada.");
+    return;
+  }
+
+  path.forEach((el) => el.addClass("highlight"));
+
+  const pathStr = path.filter((el) => el.isNode?.()).map((n) => n.id()).join(" ➔ ");
+  toast.success(`Melhor rota: ${pathStr}`);
+}
+
+function encontrarMaiorRota(inicio, destino) {
+  const visitados = new Set();
+  let maiorCaminho = [];
+  let maiorPeso = 0;
+  const startNode = cy.value.getElementById(inicio);
+  const endNode = cy.value.getElementById(destino);
+
+  if (!startNode.length || !endNode.length) {
+    toast.error("Nó inicial ou final não existe.");
+    return;
+  }
+
+  function dfs(atual, caminho, pesoTotal) {
+    if (atual === destino) {
+      if (pesoTotal > maiorPeso) {
+        maiorPeso = pesoTotal;
+        maiorCaminho = [...caminho];
+      }
+      return;
+    }
+
+    visitados.add(atual);
+
+    const vizinhos = cy.value.getElementById(atual).connectedEdges().filter((edge) => {
+      return edge.source().id() === atual && !visitados.has(edge.target().id());
+    });
+
+    vizinhos.forEach((edge) => {
+      const prox = edge.target().id();
+      const peso = edge.data("weight");
+      dfs(prox, [...caminho, edge, edge.target()], pesoTotal + peso);
+    });
+
+    visitados.delete(atual);
+  }
+
+  dfs(inicio, [startNode], 0);
+
+  if (maiorCaminho.length === 0) {
+    toast.warning("Rota não encontrada.");
+    return;
+  }
+
+  cy.value.edges().removeClass("highlight");
+  cy.value.nodes().removeClass("highlight");
+  maiorCaminho.forEach((el) => el.addClass("highlight"));
+}
+function exportarGrafoJson() {
+  const json = cy.value.json();
+  const blob = new Blob([JSON.stringify(json, null, 2)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "grafo.json";
+  a.click();
+  URL.revokeObjectURL(url);
+}
 
 onMounted(() => {
-
   cy.value = cytoscape({
-    container: document.getElementById("cyt"),
+    container: container.value,
     elements: [],
     style: [
       {
@@ -168,7 +360,6 @@ onMounted(() => {
         style: {
           label: "data(weight)",
           width: 3,
-            'label': 'data(weight)', 
           "line-color": "#888",
           "target-arrow-color": "#888",
           "target-arrow-shape": "triangle",
@@ -181,15 +372,13 @@ onMounted(() => {
           "background-color": "#00e676",
           "line-color": "#00e676",
           "target-arrow-color": "#00e676",
-          "transition-property": "background-color, line-color, target-arrow-color",
-          "transition-duration": "0.5s",
         },
       },
-      {
+       {
         selector: ".selected",
         style: {
           "border-width": 3,
-          "border-color": "#FFD700",
+          "border-color": "#5500ff",
           "border-style": "solid",
         },
       },
@@ -199,24 +388,22 @@ onMounted(() => {
       animate: true,
     },
   });
-
   cy.value.on("tap", (event) => {
-    const target = event.target;
-
+    const clickedElement = event.target;
+   
     if (
-      target !== cy.value &&
-      typeof target.isNode === "function" &&
-      target.isNode()
+      clickedElement !== cy.value &&
+      typeof clickedElement.isNode === "function" &&
+      clickedElement.isNode()
     ) {
-      //recebe o id
-      const nodeId = target.id();
+      const nodeId = clickedElement.id();
 
       if (!selectedNodes.value.includes(nodeId)) {
-        target.addClass("selected");
+        clickedElement.addClass("selected");
         selectedNodes.value.push(nodeId);
       }
 
-      if (selectedNodes.value.length === 2) {
+    if (selectedNodes.value.length === 2) {
         const [source, targetId,] = selectedNodes.value;
         console.log("dois nós selecionados", [source, targetId]);
         const edgeId = [source, targetId].join("-");
@@ -226,6 +413,13 @@ onMounted(() => {
             group: "edges",
             data: { id: edgeId, source: source, target: targetId, weight: 1 },
           });
+          const i = parseInt(source.replace(/\D/g, ""));
+const j = parseInt(targetId.replace(/\D/g, ""));
+if (!isNaN(i) && !isNaN(j)) {
+  if (matrix.value[i] && matrix.value[i][j] !== undefined) {
+    matrix.value[i][j] = 1;
+  }
+}
         }
 
         selectedNodes.value.forEach((id) => {
@@ -237,16 +431,15 @@ onMounted(() => {
       }
     } else {
       const pos = event.position || event.renderedPosition;
-      console.log("posição", pos);
-      // Define um novo id incremental para o nó
-      const newNodeId = "n" + (count++);
+      const newNodeId = "n" + count++;
+
+      const label = graphData.nodeLabel || newNodeId;
 
       cy.value.add({
         group: "nodes",
         data: {
           id: newNodeId,
-          label: graphData.nodeLabel,
-
+          label,
           color: "#7B61FF",
         },
         position: { x: pos.x, y: pos.y },
@@ -254,157 +447,60 @@ onMounted(() => {
 
       listGraph.value.push({
         nodeId: newNodeId,
-        nodeLabel: graphData.nodeLabel,
+        nodeLabel: label,
         edgeWeight: 1,
       });
-   
- 
+      matrix.value.forEach(row => row.push(0));
+matrix.value.push(new Array(matrix.value.length + 1).fill(0));
     }
-
   });
+  //excluir no 
+  cy.value.on("cxttap", "node", (event) => {
+    const node = event.target; // nó clicado 
+    noSelecionado.value = node; //armazena o nó selecionado 
+    console.log("no para excluir", node.id(), node.data())
+
+    dialogExcluirNo.value = true;
+  });
+
+   cy.value.on("tap", "node", (event) => {
+    const node = event.target;
+    noSelecionadoParaLabel.value = node;
+    dialogeditarLabelNo.value = true;
+  });
+  cy.value.on("tap", "node", (event) => {
+  const node = event.target; //nó clicado
+  noSelecionadoParaLabel.value = node; 
+  noSelecionadoParaLabelLabel.value = node.data("label"); // preencher o input
+  dialogeditarLabelNo.value = true;
 });
-
-function submit() {
-  // Validação para evitar duplicatas e campos vazios
-  if (graphData.nodeId && graphData.nodeLabel) {
-    if (cy.value.getElementById(graphData.nodeId).length === 0) {
-      cy.value.add({
-        group: "nodes",
-        data: {
-          id: graphData.nodeId,
-          label: graphData.nodeLabel,
-          color: "#7B61FF",
-        },
-      });
-
-      listGraph.value.push({
-        nodeId: graphData.nodeId,
-        nodeLabel: graphData.nodeLabel,
-        edgeWeight: graphData.edgeWeight || 1,
-      });
-    } else {
-      toast.warning("Nó com este ID já existe.");
-    }
-  }
-
-  if (graphData.sourceId && graphData.targetId) {
-    const edgeId = [graphData.sourceId, graphData.targetId].sort().join("-");
-    if (cy.value.getElementById(edgeId).length === 0) {
-      cy.value.add({
-        group: "edges",
-        data: {
-          id: edgeId,
-          source: graphData.sourceId,
-          target: graphData.targetId,
-          weight: graphData.edgeWeight || 1,
-        },
-      });
-    } else {
-      toast.warning("Aresta já existe.");
-    }
-  }
-
-  cy.value.layout({ name: "cose", animate: true }).run();
-
-
-
-  // Limpa campos
-  graphData.nodeId = "";
-  graphData.nodeLabel = "";
-  graphData.sourceId = "";
-  graphData.targetId = "";
-  graphData.edgeWeight = 1;
-}
-
-
-
-
-function encontrarMelhorRota(inicio, destino) {
-  if (!cy.value.getElementById(inicio).length || !cy.value.getElementById(destino).length) {
-    toast.error("Nó inicial ou final não existe.");
-    return;
-  }
-
-  // Remove destaque anterior
-  cy.value.edges().removeClass("highlight");
-  cy.value.nodes().removeClass("highlight");
-
-  const dijkstra = cy.value.elements().dijkstra(`#${inicio}`, (edge) => edge.data("weight"));
-
-  const path = dijkstra.pathTo(cy.value.getElementById(destino));
-
-  if (!path || path.length === 0) {
-    toast.warning("Rota não encontrada.");
-    return;
-  }
-
-  path.forEach((el) => {
-    el.addClass("highlight");
-  });
-
-  const pathStr = path
-    .filter((el) => el.isNode?.())
-    .map((n) => n.id())
-    .join(" ➝ ");
-
-  toast.success(`Melhor rota: ${pathStr}`);
-}
-function encontrarMaiorRota(inicio, destino) {
-  console.log("chamou");
-
-  const visitados = new Set();         // Armazena os nós visitados
-  let maiorCaminho = [];               // Armazena o maior caminho
-  let maiorPeso = 0;                   // Armazena o peso do maior caminho
-
-  const startNode = cy.value.getElementById(inicio);
-  const endNode = cy.value.getElementById(destino);
-
-  if (!startNode.length || !endNode.length) {
-    toast.error("Nó inicial ou final não existe.");
-    return;
-  }
-
-  function dfs(atual, caminho, pesoTotal) {
-    if (atual === destino) {
-      if (pesoTotal > maiorPeso) {
-        maiorPeso = pesoTotal;
-        maiorCaminho = [...caminho]; // Salva o caminho atual
-      }
-      return;
-    }
-
-    visitados.add(atual); // Marca o nó atual como visitado
-
-    const vizinhos = cy.value.getElementById(atual).connectedEdges().filter(edge => {
-      return edge.source().id() === atual && !visitados.has(edge.target().id());
-    });
-
-    vizinhos.forEach(edge => {
-      const prox = edge.target().id();
-      const peso = edge.data("weight"); // CORRETO
-      dfs(prox, [...caminho, edge, edge.target()], pesoTotal + peso);
-    });
-
-    visitados.delete(atual); // Remove da lista de visitados ao retornar
-  }
-
-  // INÍCIO DA EXECUÇÃO DA BUSCA
-  dfs(inicio, [startNode], 0);
-
-  if (maiorCaminho.length === 0) {
-    toast.warning("Rota não encontrada.");
-    return;
-  }
-
-  // Limpa estilos anteriores
-  cy.value.edges().removeClass("highlight");
-  cy.value.nodes().removeClass("highlight");
-
-  // Destaca o caminho mais longo encontrado
-  maiorCaminho.forEach((el) => {
-    el.addClass("highlight");
-  });
-
-}
-
+});
 </script>
+
+<style scoped>
+.matrix-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  overflow-x: auto;
+  padding: 10px 0;
+}
+
+::v-deep(.cytoscape-container) {
+  cursor: pointer;
+}
+
+.matrix-row {
+  width: fit-content;
+}
+
+.matrix-cell {
+  width: 40px;
+  height: 40px;
+  border: 1px solid #ccc;
+  text-align: center;
+  line-height: 40px;
+  cursor: pointer;
+  user-select: none;
+}
+</style>
